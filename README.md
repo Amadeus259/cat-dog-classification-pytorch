@@ -1,218 +1,229 @@
-# PyTorch Image Classification - Cats vs Dogs
+﻿# PyTorch 猫狗图像分类与开放集识别
 
-<hr />
+这是一个基于 PyTorch 和 torchvision 的图像分类项目，包含两个阶段：
 
-A PyTorch-based binary image classification project that distinguishes between cats and dogs (dataset from Kaggle) using both custom CNN architecture and transfer learning with VGG16.
+1. **猫狗二分类**：判断输入图片是猫还是狗。
+2. **开放集识别**：在猫、狗之外，识别图片是否属于未知类别。
 
-
+项目默认使用冻结的 ImageNet 预训练 VGG16 作为特征提取器，并替换分类头。未知类别示例包括牛、马和兔子。
 
 ![Result](result.jpg)
 
+## 项目结构
 
-**Supporting YouTube Videos:**
-
-1. [Image Classification (from project Structure to Inference)](https://www.youtube.com/watch?v=I84qsrJMq7Y)
-2. [Enhancing Image Classification with Transfer Learning](https://www.youtube.com/watch?v=CRua07FmjQM)
-
-**Increase the audiospeed to 1.25X for better experience**
-
-
-
-## Project Structure
-
-```
-master-pytorch-image-classification/
-├── data/
-│   ├── training_set/
-│   │   └── training_set/
-│   │       ├── cats/
-│   │       └── dogs/
-│   └── test_set/
-│       └── test_set/
-│           ├── cats/
-│           └── dogs/
-├── models/
-│   ├── imclfv1-0.pth
-│   └── imclfv2-0.pth
+```text
+cat-dog-classification-pytorch/
+├── data/                              # 本地数据集，不提交到 GitHub
+│   ├── training_set/training_set/
+│   │   ├── cats/                      # 猫训练图片
+│   │   └── dogs/                      # 狗训练图片
+│   ├── test_set/test_set/
+│   │   ├── cats/                      # 猫测试图片
+│   │   └── dogs/                      # 狗测试图片
+│   └── unknown_set/                   # 开放集未知类别
+│       ├── cow/
+│       ├── horse/
+│       └── rabbit/
+├── models/                            # 训练得到的 .pth 文件，不提交到 GitHub
+├── reports/                           # 评估生成的报告和图表，不提交到 GitHub
 ├── src/
-│   ├── data_setup.py      # Custom dataset and data loading utilities
-│   ├── engine.py          # Training, testing, and prediction functions
-│   ├── model.py           # Model architectures (Custom CNN and VGG16 transfer learning)
-│   ├── train.py           # Main training script
-│   └── utils.py           # Utility functions for saving models and plotting
-├── inference.py           # Script for making predictions on new images
-├── requirements.txt       # Python dependencies
-└── README.md             # This file
+│   ├── data_setup.py                  # 猫狗数据集和 DataLoader
+│   ├── engine.py                      # 训练、验证和推理函数
+│   ├── model.py                       # CNN、VGG16 和开放集模型
+│   ├── ood.py                         # OOD 特征和距离计算
+│   ├── openset_data.py                # 开放集数据读取与标签处理
+│   ├── train.py                       # 猫狗二分类训练入口
+│   ├── train_openset.py               # 猫/狗/未知三分类训练入口
+│   └── utils.py                       # 模型保存和绘图工具
+├── inference.py                       # 单张图片推理
+├── evaluate_unknown.py                # 基于置信度的未知检测
+├── evaluate_unknown_v2.py             # 基于特征距离的未知检测
+├── evaluate_unknown_v3.py             # 开放集模型的未知检测
+├── evaluate_ensemble.py               # 多种方法融合评估
+├── download_unknown_images.py         # 未知类别图片下载工具
+├── requirements.txt                   # Python 依赖
+├── .gitignore
+└── README.md
 ```
 
-## Features
+`data/`、`models/` 和 `reports/` 已在 `.gitignore` 中排除。克隆 GitHub 仓库后，需要自行准备数据集和模型权重。
 
-- **Two Model Architectures:**
-  - Custom CNN (`SimpleBinaryClassifier`): A lightweight 3-layer convolutional neural network
-  - VGG16 Transfer Learning: Pre-trained VGG16 with custom classifier head
+## 环境安装
 
-- **Custom Dataset Handling:** Efficient data loading with PyTorch DataLoader
-- **Training Pipeline:** Complete training loop with validation
-- **Model Persistence:** Automatic model saving during training
-- **Inference Pipeline:** Easy prediction on new images
-- **Visualization:** Training metrics plotting and inference result display
-
-## Installation
-
-1. Clone or download this repository
-2. Install the required dependencies:
+建议使用 Python 3.10 或更高版本，并在项目根目录执行：
 
 ```bash
+python -m venv .venv
+```
+
+Windows：
+
+```powershell
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-## Dataset Setup
+Linux/macOS：
 
-The project expects the following directory structure for your data:
-
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
+
+如果安装了支持 CUDA 的 PyTorch，训练脚本会自动使用 GPU；否则使用 CPU。
+
+## 数据集准备
+
+### 猫狗数据集
+
+猫狗数据集需要放置在以下路径：
+
+```text
 data/
-├── training_set/
-│   └── training_set/
-│       ├── cats/          # Cat images (.jpg files)
-│       └── dogs/          # Dog images (.jpg files)
-└── test_set/
-    └── test_set/
-        ├── cats/          # Cat test images (.jpg files)
-        └── dogs/          # Dog test images (.jpg files)
+├── training_set/training_set/cats/
+├── training_set/training_set/dogs/
+├── test_set/test_set/cats/
+└── test_set/test_set/dogs/
 ```
 
-Check the **YouTube Video** for more details on how to download your dataset from **Kaggle** and prepare for training.
+图片文件名应包含 `cat` 或 `dog`，代码会根据文件名生成二分类标签：猫为 `0`，狗为 `1`。
 
-## Usage
+### 未知类别数据集
 
-### Training a Model
+开放集训练和评估需要额外准备：
 
-Run the training script with default parameters:
+```text
+data/unknown_set/
+├── cow/
+├── horse/
+└── rabbit/
+```
+
+未知类别不应放入 `training_set/cats` 或 `training_set/dogs`。普通二分类只使用猫狗数据；开放集脚本会把未知图片作为第 3 类 `unknown` 使用，并按比例划分训练集和验证集。
+
+## 使用方法
+
+### 1. 猫狗二分类训练
+
+使用默认配置训练 20 个 epoch：
 
 ```bash
 python src/train.py
 ```
 
-Or customize the training parameters:
+自定义训练参数：
 
 ```bash
-python src/train.py --batch_size 64 --learning_rate 0.0001 --num_epochs 30 --model_name my_model.pth
+python src/train.py --batch_size 32 --learning_rate 0.001 --num_epochs 20 --model_name my-cat-dog-model.pth
 ```
 
-**Available Arguments:**
-- `--batch_size`: Batch size for training (default: 32)
-- `--learning_rate`: Learning rate for optimizer (default: 0.001)
-- `--num_epochs`: Number of training epochs (default: 20)
-- `--train_dir`: Custom training directory path
-- `--test_dir`: Custom test directory path
-- `--model_name`: Name for the saved model file (default: 01-trained-model.pth)
-- `--verbose`: Enable verbose output
+训练后会生成：
 
-### Making Predictions
+```text
+models/my-cat-dog-model.pth
+my-cat-dog-model-metrics.npz
+```
 
-Use the inference script to make predictions on new images:
+### 2. 开放集三分类训练
+
+开放集模型的类别为：
+
+```text
+0 = cat
+1 = dog
+2 = unknown
+```
+
+运行：
 
 ```bash
-python inference.py
+python src/train_openset.py --epochs 6 --batch_size 32
 ```
 
-The script will:
-1. Load a pre-trained model from the `models/` directory
-2. Make predictions on test images
-3. Display the results with visualization
+如果希望将某个未知类别完全留作测试集，例如不让 `rabbit` 参与训练：
 
-### Model Architectures
+```bash
+python src/train_openset.py --epochs 6 --holdout_unknown_classes rabbit
+```
 
-#### Custom CNN (SimpleBinaryClassifier)
-- 3 convolutional layers with ReLU activation and MaxPooling
-- Dropout layers for regularization
-- Final sigmoid activation for binary classification
-- Input: 224x224x3 RGB images
-- Output: Single probability score (0-1)
+开放集模型默认保存到 `models/openset-vgg16.pth`，评估报告保存到 `reports/openset_v3/`。
 
-#### VGG16 Transfer Learning
-- Pre-trained VGG16 backbone (frozen weights)
-- Custom classifier head with dropout
-- Adaptive average pooling
-- Input: 224x224x3 RGB images
-- Output: Single probability score (0-1)
+### 3. 单张图片推理
 
-## Training Process
+使用二分类模型：
 
-1. **Data Loading:** Images are automatically resized to 224x224 and normalized
-2. **Model Selection:** VGG16 transfer learning is used by default
-3. **Training Loop:** Model trains for specified epochs with validation
-4. **Model Saving:** Best models are saved based on validation loss
-5. **Metrics:** Training/validation accuracy and loss are tracked and saved
+```bash
+python inference.py --image path/to/image.jpg --method confidence
+```
 
-## Model Performance
+可用的未知检测方法：
 
-The trained models achieve binary classification between cats (0) and dogs (1):
-- **Threshold:** 0.5 (predictions > 0.5 = Dog, ≤ 0.5 = Cat)
-- **Loss Function:** Binary Cross Entropy (BCE)
-- **Optimizer:** Adam with weight decay
-- **Metrics:** Accuracy and loss tracked for both training and validation
+```text
+confidence    基于二分类置信度
+mahalanobis   基于特征距离
+openset       基于猫/狗/未知三分类模型
+```
 
-## Files Description
+例如使用开放集模型：
 
-- **`src/train.py`**: Main training script with command-line arguments
-- **`src/model.py`**: Contains both CNN architectures
-- **`src/data_setup.py`**: Custom dataset class and data loading utilities
-- **`src/engine.py`**: Training, validation, and prediction functions
-- **`src/utils.py`**: Helper functions for model saving and plotting
-- **`inference.py`**: Script for making predictions on new images
+```bash
+python inference.py --image path/to/image.jpg --method openset --openset_weights models/openset-vgg16.pth
+```
 
-## Requirements
+不提供 `--image` 时，脚本会从测试集中随机选择一张猫或狗图片。
 
-- Python 3.7+
-- PyTorch 1.12.0+
-- torchvision 0.13.0+
-- OpenCV 4.6.0+
-- PIL (Pillow) 9.2.0+
-- matplotlib 3.5.0+
-- tqdm 4.64.0+
-- numpy 1.21.0+
+### 4. 未知类别评估
 
-## GPU Support
+```bash
+python evaluate_unknown.py
+python evaluate_unknown_v2.py
+python evaluate_unknown_v3.py
+python evaluate_ensemble.py
+```
 
-The code automatically detects and uses CUDA if available:
-- Training will use GPU if CUDA is available
-- Falls back to CPU if no GPU is detected
-- Model and data are automatically moved to the appropriate device
+四个脚本分别进行置信度、特征距离、开放集模型和多方法融合评估。结果默认写入 `reports/`，包括 JSON 摘要、CSV 阈值扫描结果和直方图图片。
 
-## Output Files
+## 模型说明
 
-After training, the following files are generated:
-- **Model file**: `models/{model_name}.pth` - Trained model weights
-- **Metrics file**: `{model_name}-metrics.npz` - Training/validation metrics
-- **Plots**: Accuracy and loss curves (displayed during training)
+### 猫狗二分类模型
 
-## Customization
+- 默认模型：冻结 VGG16 主干 + 自定义二分类头
+- 输入尺寸：`224 x 224 x 3`
+- 输出：狗的概率，通常大于 `0.5` 判为狗，否则判为猫
+- 损失函数：Binary Cross Entropy
+- 优化器：Adam
 
-### Using Your Own Dataset
-1. Organize your images in the expected directory structure
-2. Ensure images are in `.jpg` format
-3. Update the directory paths in the training script if needed
+项目还保留了轻量级 `SimpleBinaryClassifier` CNN，可在 `src/model.py` 中查看。
 
-### Modifying Model Architecture
-- Edit `src/model.py` to add new architectures
-- Update the model instantiation in `src/train.py`
-- Adjust loss function and optimizer as needed
+### 开放集模型
 
-### Changing Training Parameters
-- Modify default values in `src/train.py`
-- Add new command-line arguments as needed
-- Adjust data transforms in `src/data_setup.py`
+开放集模型使用 VGG16 主干和三分类头输出：
 
-## Troubleshooting
+```text
+P(cat), P(dog), P(unknown)
+```
 
-**Common Issues:**
-1. **CUDA out of memory**: Reduce batch size
-2. **File not found**: Check data directory structure
-3. **Import errors**: Ensure all dependencies are installed
-4. **Model loading errors**: Verify model file path and architecture match
+它与普通二分类模型不同，能够直接把非猫狗图片判为 `unknown`。
 
-## License
+## 训练输出
 
-This project is for educational purposes. Please ensure you have appropriate licenses for any datasets used.
+训练和评估产生的文件包括：
+
+- `*.pth`：模型权重
+- `*-metrics.npz`：训练/验证损失和准确率
+- `reports/**/*.json`：评估摘要
+- `reports/**/*.csv`：阈值扫描结果
+- `reports/**/*.png`：准确率、损失和分数分布图
+
+这些文件默认不会被 Git 提交。模型文件如果需要发布，建议使用 Git LFS 或 GitHub Releases。
+
+## 常见问题
+
+- **找不到数据集**：确认当前命令在项目根目录执行，并检查 `data/` 的嵌套路径。
+- **CUDA out of memory**：降低 `--batch_size`，例如改为 `16` 或 `8`。
+- **找不到模型权重**：确认对应的 `.pth` 文件位于 `models/`，并检查推理命令中的路径。
+- **未知类别效果不理想**：检查 `data/unknown_set/` 中的类别目录和图片数量，并重新运行开放集训练或评估。
+
+## 许可证
+
+本项目用于学习和研究。使用的数据集和预训练权重请遵守其各自的许可证和使用条款。
