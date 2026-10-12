@@ -1,0 +1,31 @@
+*.zip
+*.pyc
+*.jpg
+*.png
+*.jpeg
+__pycache__
+_DS_Store
+*.npz
+*.sh
+
+# Python 虚拟环境（体积大且与机器相关）
+.venv/
+venv/
+
+# 数据集：体积很大，按 README 的说明自行下载
+data/
+cat-and-dog.zip
+
+# 评估/训练产生的报告输出
+reports/
+
+# PyTorch 权重文件：单文件约 56MB，超过 GitHub 建议的 50MB
+# 如需上传模型，请删除这一行并参考 README 使用 Git LFS
+*.pth
+
+# 编辑器与系统文件
+.vscode/
+.idea/
+Thumbs.db
+
+!result.jpg
